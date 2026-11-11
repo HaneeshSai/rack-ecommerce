@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProductKind {
+  WALL_MOUNT
+  MINI
+  NETWORK_RACK
+  SERVER_RACK
+  OPEN_RACK
+  ACCESSORY
+}
+
+enum Sourcing {
+  SOURCED
+  MANUFACTURED
+}
+
+enum Role {
+  CUSTOMER
+  DEALER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PACKED
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  WON
+  LOST
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  sort     Int       @default(0)
+  products Product[]
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  description String      @default("")
+  kind        ProductKind
+  sourcing    Sourcing    @default(MANUFACTURED)
+  uHeight     Int?
+  hsn         String      @default("")
+  gstRate     Int         @default(18)
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  variants    Variant[]
+  createdAt   DateTime    @default(now())
+}
+
+// Prices are in paise (integer) to avoid float errors.
+model Variant {
+  id                String      @id @default(cuid())
+  sku               String      @unique
+  productId         String
+  product           Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  depthMm           Int?
+  widthMm           Int?
+  heightMm          Int?
+  label             String      @default("")
+  retailPrice       Int
+  dealerPrice       Int
+  // Data from the client brief that looks wrong and must be confirmed.
+  needsConfirmation Boolean     @default(false)
+  confirmNote       String?
+  stock             Stock[]
+  orderItems        OrderItem[]
+}
+
+model Warehouse {
+  id    String  @id @default(cuid())
+  code  String  @unique
+  name  String
+  city  String
+  stock Stock[]
+}
+
+model Stock {
+  variantId   String
+  warehouseId String
+  qty         Int       @default(0)
+  variant     Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@id([variantId, warehouseId])
+}
+
+model Dealer {
+  id           String  @id @default(cuid())
+  businessName String
+  gstin        String  @unique
+  gstVerified  Boolean @default(false)
+  contactName  String
+  phone        String
+  city         String
+  creditLimit  Int     @default(0)
+  creditUsed   Int     @default(0)
+  users        User[]
+  orders       Order[]
+}
+
+model User {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  name     String
+  role     Role
+  dealerId String?
+  dealer   Dealer? @relation(fields: [dealerId], references: [id])
+  orders   Order[]
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  number        String      @unique
+  status        OrderStatus @default(PENDING)
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id])
+  dealerId      String?
+  dealer        Dealer?     @relation(fields: [dealerId], references: [id])
+  customerName  String
+  customerPhone String
+  customerGstin String?
+  shipState     String
+  subtotal      Int
+  gstAmount     Int
+  shipping      Int         @default(0)
+  total         Int
+  paymentMode   String      @default("ONLINE")
+  items         OrderItem[]
+  createdAt     DateTime    @default(now())
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   Variant @relation(fields: [variantId], references: [id])
+  qty       Int
+  unitPrice Int
+  gstRate   Int
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  name      String
+  company   String?
+  phone     String
+  interest  String
+  status    LeadStatus @default(NEW)
+  source    String     @default("website")
+  createdAt DateTime   @default(now())
+}
