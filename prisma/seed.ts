@@ -112,7 +112,8 @@ async function main() {
       data: warehouses.map((w, i) => ({
         variantId,
         warehouseId: w.id,
-        qty: i === 0 ? Math.floor(rand() * 40) : Math.floor(rand() * 18),
+        // Mostly healthy stock; roughly 1 in 8 lines is low or out, to demo the alerts.
+        qty: rand() < 0.12 ? Math.floor(rand() * 4) : i === 0 ? 12 + Math.floor(rand() * 40) : 5 + Math.floor(rand() * 20),
       })),
     });
   };
@@ -132,16 +133,17 @@ async function main() {
         description: `${s.name} for network, CCTV and server equipment. Standard 19-inch mounting.`,
       },
     });
+    const mixedWidths = new Set(s.rows.map((r) => r[1])).size > 1;
     for (const [depth, width, height, flag] of s.rows) {
       const retail = samplePrice(s.u, depth, wall);
       const v = await db.variant.create({
         data: {
-          sku: `${s.cat.slice(0, 2).toUpperCase()}${s.u}U-${depth}`,
+          sku: `${s.cat.slice(0, 2).toUpperCase()}${s.u}U-${depth}-${width ?? "NA"}`,
           productId: product.id,
           depthMm: depth,
           widthMm: width,
           heightMm: height,
-          label: `${depth}mm depth`,
+          label: mixedWidths ? `${depth}mm depth, ${width}mm wide` : `${depth}mm depth`,
           retailPrice: retail,
           dealerPrice: Math.round((retail * 0.82) / 100) * 100,
           needsConfirmation: !!flag,

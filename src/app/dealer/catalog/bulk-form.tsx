@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Card } from "@/components/ui";
 import { placeDealerOrder } from "@/lib/actions/dealer";
 import { inr } from "@/lib/money";
@@ -8,7 +9,14 @@ import { inr } from "@/lib/money";
 type Row = { id: string; name: string; label: string; sku: string; retail: number; dealer: number; stock: number };
 
 export function BulkOrderForm({ rows }: { rows: Row[] }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(placeDealerOrder, undefined);
+  useEffect(() => {
+    if (state && "ok" in state) {
+      router.push("/orders");
+      router.refresh();
+    }
+  }, [state, router]);
   return (
     <form action={action}>
       <Card className="overflow-x-auto">
@@ -41,7 +49,7 @@ export function BulkOrderForm({ rows }: { rows: Row[] }) {
       </Card>
       <div className="mt-4 flex items-center gap-4">
         <Button type="submit" disabled={pending}>{pending ? "Placing..." : "Place order on credit"}</Button>
-        {state?.error && <span className="text-sm text-red-600">{state.error}</span>}
+        {state && "error" in state && <span className="text-sm text-red-600">{state.error}</span>}
         <span className="text-xs text-muted">Prices exclude 18% GST.</span>
       </div>
     </form>

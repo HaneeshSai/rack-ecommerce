@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Card, PageTitle, inputCls } from "@/components/ui";
 import { useCart } from "@/components/cart";
 import { placeOrder } from "@/lib/actions/orders";
@@ -9,6 +10,7 @@ import { inr, inr2 } from "@/lib/money";
 
 export default function CheckoutPage() {
   const { items, clear } = useCart();
+  const router = useRouter();
   const [state, setState] = useState("Telangana");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -29,9 +31,11 @@ export default function CheckoutPage() {
         state,
         items: items.map((i) => ({ variantId: i.variantId, qty: i.qty })),
       });
-      // placeOrder redirects on success; it only returns when there is an error.
-      if (res?.error) setError(res.error);
-      else clear();
+      if ("error" in res) setError(res.error);
+      else {
+        clear();
+        router.push(`/order/${res.orderNumber}`);
+      }
     });
   };
 

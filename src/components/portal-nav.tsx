@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui";
-import { logout } from "@/lib/actions/auth";
+import { SignOut } from "@/components/sign-out";
 
 export function PortalNav({
   title,
@@ -25,10 +24,10 @@ export function PortalNav({
           )}
         </div>
         {who && (
-          <form action={logout} className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm">
             <span className="text-slate-300">{who}</span>
-            <Button variant="ghost" className="!py-1.5 text-foreground">Sign out</Button>
-          </form>
+            <SignOut />
+          </div>
         )}
       </div>
     </header>

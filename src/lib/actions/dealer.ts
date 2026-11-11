@@ -1,11 +1,10 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { gstBreakup, WAREHOUSE_STATE } from "@/lib/gst";
 
-export type DealerOrderResult = { error: string } | undefined;
+export type DealerOrderResult = { error: string } | { ok: true } | undefined;
 
 // Dealer identity comes from the session, never from the form.
 export async function placeDealerOrder(
@@ -77,5 +76,5 @@ export async function placeDealerOrder(
     db.dealer.update({ where: { id: dealerId }, data: { creditUsed: { increment: g.total } } }),
   ]);
 
-  redirect("/orders");
+  return { ok: true };
 }

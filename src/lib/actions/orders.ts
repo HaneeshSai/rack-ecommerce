@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { gstBreakup, WAREHOUSE_STATE } from "@/lib/gst";
@@ -13,7 +12,7 @@ const schema = z.object({
   items: z.array(z.object({ variantId: z.string(), qty: z.number().int().min(1).max(500) })).min(1),
 });
 
-export type PlaceOrderResult = { error: string } | undefined;
+export type PlaceOrderResult = { error: string } | { orderNumber: string };
 
 // Never trusts prices from the client: re-reads them from the database.
 export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
@@ -65,5 +64,5 @@ export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
     },
   });
 
-  redirect(`/order/${number}`);
+  return { orderNumber: number };
 }
