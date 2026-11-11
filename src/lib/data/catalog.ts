@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { ProductKind } from "@/generated/prisma/client";
+import type { ProductKind } from "@/lib/db";
 
 export type CatalogFilter = {
   u?: number;

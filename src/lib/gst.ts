@@ -22,7 +22,26 @@ export type GstBreakup = {
   intraState: boolean;
 };
 
-// Prices are treated as tax-exclusive. (Open question for the client.)
+// Retail prices are stored GST-inclusive (spec). `amount` is the tax-inclusive line
+// total; returns the same breakup shape with `subtotal` = taxable value.
+export function gstBreakupInclusive(lines: GstLine[], sellerState: string, buyerState: string): GstBreakup {
+  const intraState = sellerState === buyerState;
+  let subtotal = 0, cgst = 0, sgst = 0, igst = 0, total = 0;
+  for (const l of lines) {
+    const taxable = Math.round((l.amount * 100) / (100 + l.rate));
+    const tax = l.amount - taxable;
+    subtotal += taxable;
+    total += l.amount;
+    if (intraState) {
+      const half = Math.round(tax / 2);
+      cgst += half;
+      sgst += tax - half;
+    } else igst += tax;
+  }
+  return { subtotal, cgst, sgst, igst, gstTotal: cgst + sgst + igst, total, intraState };
+}
+
+// Dealer prices are tax-exclusive.
 export function gstBreakup(lines: GstLine[], sellerState: string, buyerState: string): GstBreakup {
   const intraState = sellerState === buyerState;
   let subtotal = 0, cgst = 0, sgst = 0, igst = 0;

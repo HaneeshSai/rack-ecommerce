@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "@/components/icons";
 import { useCart } from "@/components/cart";
 
 export function CartLink() {

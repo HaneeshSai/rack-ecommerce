@@ -9,7 +9,7 @@ export function SignOut() {
   return (
     <Button
       variant="ghost"
-      className="!py-1.5 text-foreground"
+      className="!py-1.5"
       onClick={async () => {
         await logout();
         router.push("/login");

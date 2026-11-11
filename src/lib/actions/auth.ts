@@ -1,16 +1,14 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db, type Role } from "@/lib/db";
 import { signIn, signOut } from "@/lib/session";
-import type { Role } from "@/generated/prisma/client";
 
-// These return a result instead of calling redirect(): a server-action
-// redirect is re-rendered without the original Host header, so on the
-// dealers/admin domains it lands on the store. The client navigates instead.
-export async function demoLogin(role: Role, formData: FormData): Promise<{ ok: boolean }> {
+// Demo sign-in only (no real auth). Returns a result instead of redirecting: a
+// server-action redirect loses the Host header on the dealers/admin subdomains.
+export async function demoLogin(roles: Role[], formData: FormData): Promise<{ ok: boolean }> {
   const id = String(formData.get("userId") ?? "");
   const user = await db.user.findUnique({ where: { id } });
-  if (!user || user.role !== role) return { ok: false };
+  if (!user || !roles.includes(user.role)) return { ok: false };
   await signIn(user.id);
   return { ok: true };
 }

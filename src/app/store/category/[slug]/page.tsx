@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import clsx from "clsx";
 import { PageTitle } from "@/components/ui";
-import { ProductCard } from "@/components/product-card";
+import { StoreCard } from "@/components/store/store-card";
+import { cardData } from "@/components/store/stock";
 import { getCategory, getFilterOptions, listProducts } from "@/lib/data/catalog";
 
 export default async function CategoryPage({
@@ -10,7 +11,7 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ u?: string; depth?: string }>;
+  searchParams: Promise<{ u?: string; depth?: string; q?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -19,24 +20,26 @@ export default async function CategoryPage({
 
   const u = sp.u ? Number(sp.u) : undefined;
   const depth = sp.depth ? Number(sp.depth) : undefined;
+  const q = sp.q?.trim() || undefined;
   const [products, options] = await Promise.all([
-    listProducts(slug, { u, depth }),
+    listProducts(slug, { u, depth, q }),
     getFilterOptions(slug),
   ]);
 
   const href = (next: { u?: number; depth?: number }) => {
-    const q = new URLSearchParams();
+    const p = new URLSearchParams();
     const nu = "u" in next ? next.u : u;
     const nd = "depth" in next ? next.depth : depth;
-    if (nu) q.set("u", String(nu));
-    if (nd) q.set("depth", String(nd));
-    const s = q.toString();
+    if (nu) p.set("u", String(nu));
+    if (nd) p.set("depth", String(nd));
+    if (q) p.set("q", q);
+    const s = p.toString();
     return `/category/${slug}${s ? `?${s}` : ""}`;
   };
 
   const chip = (active: boolean) =>
     clsx(
-      "rounded-full border px-3 py-1 text-sm",
+      "rounded-full border px-3 py-1 text-sm transition",
       active ? "border-accent bg-accent text-white" : "border-line bg-white hover:border-accent",
     );
 
@@ -45,6 +48,18 @@ export default async function CategoryPage({
       <PageTitle title={category.name} sub={`${products.length} products`} />
       <div className="grid gap-8 md:grid-cols-[220px_1fr]">
         <aside className="space-y-6">
+          <form method="get" className="space-y-2">
+            <div className="text-sm font-semibold">Product name</div>
+            {u && <input type="hidden" name="u" value={u} />}
+            {depth && <input type="hidden" name="depth" value={depth} />}
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="e.g. 42U"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+            <button className="w-full rounded-lg border border-line bg-white py-1.5 text-sm font-semibold hover:bg-slate-50">Filter</button>
+          </form>
           {options.us.length > 0 && (
             <div>
               <div className="mb-2 text-sm font-semibold">Height (U)</div>
@@ -74,7 +89,7 @@ export default async function CategoryPage({
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               {products.map((p) => (
-                <ProductCard key={p.id} href={`/product/${p.slug}`} name={p.name} uHeight={p.uHeight} variants={p.variants} />
+                <StoreCard key={p.id} d={cardData(p)} />
               ))}
             </div>
           )}

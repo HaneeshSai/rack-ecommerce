@@ -1,50 +1,43 @@
-import { Card, PageTitle } from "@/components/ui";
-import { db } from "@/lib/db";
-import { requireUser } from "@/lib/session";
-import { setStock } from "@/lib/actions/admin";
+import { PageTitle } from "@/components/ui";
+import { requireStaff } from "@/lib/session";
+import { mock } from "@/lib/db";
+import { StockManager } from "@/components/admin/stock-manager";
 
 export default async function AdminStock() {
-  await requireUser("ADMIN");
-  const [warehouses, variants] = await Promise.all([
-    db.warehouse.findMany({ orderBy: { code: "asc" } }),
-    db.variant.findMany({
-      orderBy: [{ product: { name: "asc" } }, { depthMm: "asc" }],
-      include: { product: true, stock: true },
-    }),
-  ]);
+  const user = await requireStaff("stock");
+  const S = mock.S();
+  const own = user.role === "WAREHOUSE" ? user.warehouse : null;
+  const whs = S.warehouses.filter((w) => !own || w.code === own);
+  const code = (id: string) => S.warehouses.find((w) => w.id === id)?.code ?? "";
+
+  const rows = S.variants.map((v) => {
+    const p = S.products.find((x) => x.id === v.productId)!;
+    const qty: Record<string, number> = {};
+    for (const w of S.warehouses) qty[w.code] = S.stock.find((x) => x.variantId === v.id && x.warehouseId === w.id)?.qty ?? 0;
+    return { id: v.id, name: `${p.name} - ${v.label}`, sku: v.sku, manufactured: p.sourcing === "MANUFACTURED", cost: v.dealerPrice, qty };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  const movements = S.movements
+    .filter((m) => !own || code(m.warehouseId) === own)
+    .map((m) => ({ id: m.id, item: mock.variantName(m.variantId), wh: code(m.warehouseId), delta: m.delta, type: m.type, reason: m.reason, by: m.by, at: m.at.toISOString() }));
+  const transfers = S.transfers.map((t) => ({ id: t.id, item: mock.variantName(t.variantId), variantId: t.variantId, from: t.from, to: t.to, qty: t.qty, status: t.status, at: t.at.toISOString() }));
+
   return (
     <>
-      <PageTitle title="Stock by warehouse" sub="Edit a quantity and press Enter." />
-      <Card className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="border-b border-line bg-slate-50 text-left text-xs uppercase text-muted">
-            <tr>
-              <th className="p-3">Product</th><th className="p-3">SKU</th>
-              {warehouses.map((w) => <th key={w.id} className="p-3">{w.city}</th>)}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {variants.map((v) => (
-              <tr key={v.id}>
-                <td className="p-3">{v.product.name} <span className="text-muted">{v.label}</span></td>
-                <td className="p-3 text-muted">{v.sku}</td>
-                {warehouses.map((w) => {
-                  const qty = v.stock.find((s) => s.warehouseId === w.id)?.qty ?? 0;
-                  return (
-                    <td key={w.id} className="p-3">
-                      <form action={setStock.bind(null, v.id, w.id)}>
-                        <input name="qty" type="number" min={0} defaultValue={qty}
-                          className={"w-20 rounded-lg border px-2 py-1 " + (qty < 5 ? "border-red-300 bg-red-50" : "border-line")} />
-                        <button className="sr-only">Save</button>
-                      </form>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <PageTitle
+        title="Stock by warehouse"
+        sub={own ? `You manage the ${own} hub. Every change is logged with a reason.` : "Levels, movements, transfers between hubs and production entries. Every change is logged."}
+      />
+      <StockManager
+        warehouses={whs.map((w) => ({ code: w.code, city: w.city }))}
+        allWarehouses={S.warehouses.map((w) => w.code)}
+        rows={rows}
+        movements={movements}
+        transfers={transfers}
+        lowStock={S.settings.lowStock}
+        staffName={user.name}
+        ownHub={own}
+      />
     </>
   );
 }
