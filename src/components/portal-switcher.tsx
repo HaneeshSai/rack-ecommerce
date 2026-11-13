@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 const PORTALS = [
   { key: "store", label: "Store" },
   { key: "dealers", label: "Dealer Portal" },
+  { key: "crm", label: "CRM" },
   { key: "admin", label: "Admin" },
 ] as const;
 
@@ -19,6 +20,7 @@ function savedPortal(): PortalKey {
     const m = document.cookie.match(/(?:^|; )rack_portal=([^;]+)/);
     if (m?.[1] === "dealer") return "dealers";
     if (m?.[1] === "admin") return "admin";
+    if (m?.[1] === "crm") return "crm";
   } catch {}
   return "store";
 }

@@ -35,6 +35,7 @@ export const ROLE_LABEL: Record<string, string> = {
   SALES: "Sales",
   WAREHOUSE: "Warehouse",
   ACCOUNTS: "Accounts",
+  CRM: "CRM",
 };
 
 export const TIER_LABEL: Record<string, string> = { SILVER: "Silver", GOLD: "Gold", PLATINUM: "Platinum" };

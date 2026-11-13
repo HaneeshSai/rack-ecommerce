@@ -1,6 +1,7 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db, mock } from "@/lib/db";
+import { crmTotals } from "@/lib/crm-data";
 import { requireUser } from "@/lib/session";
 import { gstBreakup, WAREHOUSE_STATE } from "@/lib/gst";
 
@@ -77,4 +78,31 @@ export async function placeDealerOrder(
   ]);
 
   return { ok: true };
+}
+
+// Prototype online payment against an invoice. No real gateway: it records the payment.
+export async function payInvoice(kind: "order" | "crm", id: string, method: string): Promise<{ ok: boolean; msg: string }> {
+  const user = await requireUser("DEALER");
+  const S = mock.S();
+  const ref = `ONLINE-${method.toUpperCase().replace(/\W/g, "")}-${String(Date.now()).slice(-6)}`;
+
+  if (kind === "order") {
+    const o = S.orders.find((x) => x.id === id && x.dealerId === user.dealerId);
+    if (!o || o.paid || !o.invoiceNo) return { ok: false, msg: "This invoice cannot be paid." };
+    o.paid = true;
+    o.utr = ref;
+    o.timeline.push({ status: o.status, at: new Date(), by: o.customerName, note: `Paid online (${method})` });
+    const d = S.dealers.find((x) => x.id === user.dealerId);
+    if (d && o.paymentMode === "CREDIT") d.creditUsed = Math.max(0, d.creditUsed - o.total);
+    mock.notify("Online payment received", "Accounts", ["Email", "In-app"], `${o.number}: ${method} ${ref}`, o.number);
+    return { ok: true, msg: `Payment received for ${o.invoiceNo}` };
+  }
+
+  const c = S.crmOrders.find((x) => x.id === id && x.dealerId === user.dealerId);
+  if (!c || c.stage !== "DOCS_SENT" || c.payment) return { ok: false, msg: "This invoice cannot be paid." };
+  const total = crmTotals(c).total;
+  c.payment = { utr: ref, amount: total, mode: method, at: new Date(), reported: false };
+  c.timeline.push({ at: new Date(), by: "Dealer", text: `Paid online (${method}), reference ${ref}` });
+  mock.notify("Online payment received", "CRM, Accounts", ["In-app"], `${c.number}: ${method} ${ref}. Report it to accounts.`, c.number);
+  return { ok: true, msg: `Payment received for ${c.invoiceNo}` };
 }

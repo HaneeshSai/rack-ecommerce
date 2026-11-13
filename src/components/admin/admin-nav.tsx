@@ -9,10 +9,12 @@ export function AdminNav({
   links,
   who,
   role,
+  title = "Back Office",
 }: {
   links: { href: string; label: string }[];
   who?: string;
   role?: string;
+  title?: string;
 }) {
   const path = usePathname();
   const active = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
@@ -22,7 +24,7 @@ export function AdminNav({
         <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm">R</span>
           <span>
-            <span className="text-accent">Rack</span>Hub <span className="font-normal text-slate-300">Back Office</span>
+            <span className="text-accent">Rack</span>Hub <span className="font-normal text-slate-300">{title}</span>
           </span>
         </Link>
         {who && (

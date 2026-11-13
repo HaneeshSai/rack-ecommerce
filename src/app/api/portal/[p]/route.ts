@@ -3,11 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // Hosted preview links (like name.netlify.app) have no subdomains, so the portal
 // switcher lands here: remember the chosen portal in a cookie and go to "/".
 // src/proxy.ts reads the cookie and serves that portal at the root.
-const PORTALS: Record<string, "store" | "dealer" | "admin"> = {
+const PORTALS: Record<string, "store" | "dealer" | "admin" | "crm"> = {
   store: "store",
   dealers: "dealer",
   dealer: "dealer",
   admin: "admin",
+  crm: "crm",
 };
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ p: string }> }) {

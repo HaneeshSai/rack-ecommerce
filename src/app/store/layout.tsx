@@ -59,6 +59,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
                   {c.name}
                 </Link>
               ))}
+              <span className="mx-1 self-center text-line">|</span>
+              <Link href="/finder" className="whitespace-nowrap rounded-lg px-3 py-1.5 font-semibold text-accent transition hover:bg-accent-soft">Rack finder</Link>
+              <Link href="/track" className="whitespace-nowrap rounded-lg px-3 py-1.5 font-semibold text-accent transition hover:bg-accent-soft">Track order</Link>
             </nav>
           </header>
           <ViewerBanner />
@@ -78,6 +81,8 @@ export default async function StoreLayout({ children }: { children: React.ReactN
                   {categories.slice(0, 4).map((c) => (
                     <li key={c.id}><Link href={`/category/${c.slug}`} className="hover:text-white">{c.name}</Link></li>
                   ))}
+                  <li><Link href="/finder" className="hover:text-white">Rack finder</Link></li>
+                  <li><Link href="/track" className="hover:text-white">Track your order</Link></li>
                   <li><Link href="/request-quote" className="hover:text-white">Request a quote</Link></li>
                   <li><Link href="/dealer-registration" className="hover:text-white">Dealer registration</Link></li>
                 </ul>

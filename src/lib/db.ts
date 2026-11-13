@@ -3,11 +3,11 @@
 // restart. Pages can use `db.*` (Prisma-like helpers) or read/write `mock.S()`
 // directly (raw arrays) for the newer CRM / ops features.
 
-import { DEFAULT_CITIES, DEFAULT_FREIGHT, type CityRule, type FreightTable, type ShippingClass, type Tier } from "@/lib/logistics";
+import { DEFAULT_CITIES, DEFAULT_FREIGHT, tierPrice, type CityRule, type FreightTable, type ShippingClass, type Tier } from "@/lib/logistics";
 import { gstBreakup, gstBreakupInclusive } from "@/lib/gst";
 
 export type ProductKind = "WALL_MOUNT" | "MINI" | "NETWORK_RACK" | "SERVER_RACK" | "OPEN_RACK" | "ACCESSORY";
-export type Role = "CUSTOMER" | "DEALER" | "ADMIN" | "SALES" | "WAREHOUSE" | "ACCOUNTS";
+export type Role = "CUSTOMER" | "DEALER" | "ADMIN" | "SALES" | "WAREHOUSE" | "ACCOUNTS" | "CRM";
 export type OrderStatus = "PLACED" | "PAYMENT_PENDING" | "CONFIRMED" | "PACKED" | "DISPATCHED" | "DELIVERED" | "CANCELLED" | "RETURNED";
 export type LeadStatus = "NEW" | "CONTACTED" | "QUOTE_SENT" | "NEGOTIATION" | "WON" | "LOST";
 export type DealerStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -74,6 +74,22 @@ export type Transfer = {
   id: string; variantId: string; from: string; to: string; qty: number; status: "IN_TRANSIT" | "RECEIVED"; at: Date;
 };
 export type Activity = { id: string; who: string; action: string; at: Date };
+
+// CRM coordinator flow: field sales order -> screening -> accounts -> invoice/DC ->
+// vehicle -> dispatch -> docs to dealer -> payment follow-up -> reported to accounts.
+export type CrmStage = "NEW" | "WITH_ACCOUNTS" | "INVOICED" | "LOGISTICS" | "DISPATCHED" | "DOCS_SENT" | "PAID";
+export type CrmLine = { variantId: string; qty: number; price: number };
+export type CrmOrder = {
+  id: string; number: string; dealerId: string; fieldRep: string; lines: CrmLine[]; terms: string;
+  hub: string; stage: CrmStage; notes: string; proformaNo: string | null;
+  invoiceNo: string | null; dcNo: string | null;
+  vehicle: { provider: string; vehicleType: string; vehicleNo: string; driverName: string; driverPhone: string; bookingId: string } | null;
+  dueDate: Date | null; delivered: boolean;
+  payment: { utr: string; amount: number; mode: string; at: Date; reported: boolean } | null;
+  followups: { at: Date; by: string; note: string; promiseDate: string | null }[];
+  timeline: { at: Date; by: string; text: string }[];
+  createdAt: Date;
+};
 export type Notification = {
   id: string; event: string; to: string; channels: string[]; text: string; ref: string | null; at: Date;
 };
@@ -121,7 +137,7 @@ type State = {
   categories: Category[]; products: Product[]; variants: Variant[]; warehouses: Warehouse[];
   stock: StockRow[]; dealers: Dealer[]; users: User[]; orders: Order[]; items: OrderItem[]; leads: Lead[];
   quotes: Quote[]; tickets: Ticket[]; tasks: Task[]; movements: StockMovement[]; transfers: Transfer[];
-  activity: Activity[]; notifications: Notification[]; settings: Settings;
+  activity: Activity[]; notifications: Notification[]; settings: Settings; crmOrders: CrmOrder[];
   seq: number; invoiceSeq: number;
 };
 
@@ -135,7 +151,7 @@ function seed(): State {
   const now = Date.now();
   const s: State = {
     categories: [], products: [], variants: [], warehouses: [], stock: [], dealers: [], users: [], orders: [], items: [],
-    leads: [], quotes: [], tickets: [], tasks: [], movements: [], transfers: [], activity: [], notifications: [],
+    leads: [], quotes: [], tickets: [], tasks: [], movements: [], transfers: [], activity: [], notifications: [], crmOrders: [],
     settings: {
       holdDays: 3, discountApprovalPct: 10, splitDefault: "SPLIT", lowStock: 5, blockOverdueCredit: true, inactiveDays: 60,
       freight: structuredClone(DEFAULT_FREIGHT), cities: structuredClone(DEFAULT_CITIES),
@@ -238,6 +254,7 @@ function seed(): State {
     { id: id("u"), email: "sales@demo.test", name: "Meera (Sales)", role: "SALES", dealerId: null, warehouse: null },
     { id: id("u"), email: "wh-hyd@demo.test", name: "Prakash (Hyderabad hub)", role: "WAREHOUSE", dealerId: null, warehouse: "HYD" },
     { id: id("u"), email: "accounts@demo.test", name: "Sunita (Accounts)", role: "ACCOUNTS", dealerId: null, warehouse: null },
+    { id: id("u"), email: "crm@demo.test", name: "Neha (CRM Coordinator)", role: "CRM", dealerId: null, warehouse: null },
     { id: id("u"), email: "customer@demo.test", name: "Demo Customer", role: "CUSTOMER", dealerId: null, warehouse: null },
     { id: id("u"), email: "dealer@demo.test", name: "Ravi Kumar", role: "DEALER", dealerId: s.dealers[0].id, warehouse: null },
     { id: id("u"), email: "dealer2@demo.test", name: "Anil Reddy", role: "DEALER", dealerId: s.dealers[1].id, warehouse: null },
@@ -297,6 +314,53 @@ function seed(): State {
   mk(4, 1, null, "CONFIRMED", 2);
   mk(6, 5, null, "DELIVERED", 15);
 
+  // ---- CRM sales orders: one per stage so the portal shows the whole flow ----
+  const ORDER: CrmStage[] = ["NEW", "WITH_ACCOUNTS", "INVOICED", "LOGISTICS", "DISPATCHED", "DOCS_SENT", "PAID"];
+  const CRM = "Neha (CRM Coordinator)";
+  const crm = (o: { n: number; dealer: Dealer; v: [number, number][]; terms: string; rep: string; stage: CrmStage; ago: number; hub?: string; notes?: string }) => {
+    const at = (d: number) => new Date(now - Math.max(0, o.ago - d) * DAY);
+    const k = ORDER.indexOf(o.stage);
+    const hub = o.hub ?? o.dealer.homeWarehouse;
+    const advance = o.terms.startsWith("Advance");
+    const credit = o.terms.match(/(\d+) days/);
+    const no = 5000 + o.n;
+    const co: CrmOrder = {
+      id: id("so"), number: `SO-${no}`, dealerId: o.dealer.id, fieldRep: o.rep, terms: o.terms, hub, stage: o.stage, notes: o.notes ?? "",
+      lines: o.v.map(([vi, qty]) => ({ variantId: s.variants[vi].id, qty, price: tierPrice(s.variants[vi].dealerPrice, o.dealer.tier) })),
+      proformaNo: advance && k >= 1 ? `PF/SO-${no}` : null,
+      invoiceNo: k >= 2 ? `${s.settings.invoiceSeries}${String(100 + o.n).padStart(4, "0")}` : null,
+      dcNo: k >= 2 ? `DC-${100 + o.n}` : null,
+      vehicle: k >= 3 ? { provider: "Porter", vehicleType: "Three-wheeler", vehicleNo: `TS09 UB ${4400 + o.n}`, driverName: "Mahesh", driverPhone: `984800000${o.n}`, bookingId: `PRT-${7000 + o.n}` } : null,
+      dueDate: k >= 5 && credit ? new Date(at(5).getTime() + Number(credit[1]) * DAY) : null, delivered: k >= 5,
+      payment: null,
+      followups: o.stage === "DOCS_SENT"
+        ? [{ at: new Date(now - 1 * DAY), by: CRM, note: "Called the dealer's accounts person. Payment promised this week.", promiseDate: new Date(now + 2 * DAY).toISOString().slice(0, 10) }]
+        : [],
+      timeline: [], createdAt: at(0),
+    };
+    const t = (d: number, by: string, text: string) => co.timeline.push({ at: at(d), by, text });
+    t(0, o.rep, `Sales order received from ${o.rep}`);
+    if (k >= 1) t(1, CRM, "Screened and sent to accounts");
+    if (k >= 2) t(2, "Sunita (Accounts)", "Invoice and DC received from accounts");
+    if (k >= 3) t(3, CRM, "Vehicle booked on Porter");
+    if (k >= 4) t(4, CRM, `Dispatched from ${hub}; ${o.rep} informed`);
+    if (k >= 5) t(5, CRM, "Invoice, DC and driver details sent to dealer");
+    if (k >= 6) {
+      const sub = co.lines.reduce((n, l) => n + l.qty * l.price, 0);
+      co.payment = { utr: `HDFCN26110${o.n}042`, amount: Math.round(sub * 1.18), mode: "NEFT", at: at(6), reported: true };
+      t(6, CRM, "Payment received and reported to accounts");
+    }
+    s.crmOrders.push(co);
+  };
+  crm({ n: 1, dealer: d1, v: [[8, 2], [12, 4]], terms: "Credit 15 days", rep: "Suresh (Field Sales)", stage: "NEW", ago: 0.3, notes: "Needs delivery before Saturday" });
+  crm({ n: 2, dealer: d3, v: [[net, 2]], terms: "Credit 15 days", rep: "Imran (Field Sales)", stage: "NEW", ago: 0.5, notes: "Dealer has an overdue invoice" });
+  crm({ n: 3, dealer: d0, v: [[5, 3]], terms: "Credit 30 days", rep: "Anand (Field Sales)", stage: "WITH_ACCOUNTS", ago: 4 });
+  crm({ n: 4, dealer: d1, v: [[10, 3]], terms: "Advance (NEFT/RTGS)", rep: "Suresh (Field Sales)", stage: "INVOICED", ago: 7 });
+  crm({ n: 5, dealer: d0, v: [[2, 5], [14, 6]], terms: "Credit 30 days", rep: "Anand (Field Sales)", stage: "LOGISTICS", ago: 3, hub: "VJA" });
+  crm({ n: 6, dealer: d1, v: [[4, 2]], terms: "Credit 15 days", rep: "Suresh (Field Sales)", stage: "DISPATCHED", ago: 4 });
+  crm({ n: 7, dealer: d0, v: [[6, 2]], terms: "Credit 30 days", rep: "Anand (Field Sales)", stage: "DOCS_SENT", ago: 36 });
+  crm({ n: 8, dealer: d1, v: [[3, 4]], terms: "Credit 15 days", rep: "Imran (Field Sales)", stage: "PAID", ago: 9 });
+
   s.quotes = [
     {
       id: id("q"), number: "QT-2001", dealerId: d0.id, leadId: null, status: "SENT", discountPct: 5, version: 1,
@@ -340,7 +404,7 @@ function seed(): State {
 }
 
 // Bump SEED_VERSION when the seed shape changes so a running dev server drops its stale copy.
-const SEED_VERSION = 2;
+const SEED_VERSION = 5;
 const g = globalThis as unknown as { __mockState?: State; __mockVersion?: number };
 const S = () => {
   if (!g.__mockState || g.__mockVersion !== SEED_VERSION) {

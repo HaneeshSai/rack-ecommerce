@@ -36,9 +36,11 @@ export default async function DealerCatalog({ searchParams }: { searchParams: Pr
 
   // Reorder: prefill quantities from a previous order (lines from other categories are appended).
   const initialQty: Record<string, number> = {};
-  const source = reorder ? S.orders.find((o) => o.number === reorder && o.dealerId === dealer.id) : undefined;
+  const crmSource = reorder ? S.crmOrders.find((o) => o.number === reorder && o.dealerId === dealer.id) : undefined;
+  const source = reorder ? S.orders.find((o) => o.number === reorder && o.dealerId === dealer.id) ?? (crmSource && { number: crmSource.number, id: crmSource.id }) : undefined;
+  const reorderLines = crmSource ? crmSource.lines.map((l) => ({ variantId: l.variantId, qty: l.qty })) : source ? S.items.filter((i) => i.orderId === source.id) : [];
   if (source) {
-    for (const it of S.items.filter((i) => i.orderId === source.id)) {
+    for (const it of reorderLines) {
       initialQty[it.variantId] = it.qty;
       if (!rows.some((r) => r.id === it.variantId)) {
         const v = S.variants.find((x) => x.id === it.variantId);

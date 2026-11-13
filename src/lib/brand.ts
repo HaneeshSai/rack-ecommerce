@@ -6,7 +6,8 @@ export const BRAND = {
 };
 
 // Host (first label) -> internal route folder. Everything else is the store.
-export const PORTAL_BY_SUBDOMAIN: Record<string, "dealer" | "admin"> = {
+export const PORTAL_BY_SUBDOMAIN: Record<string, "dealer" | "admin" | "crm"> = {
   dealers: "dealer",
   admin: "admin",
+  crm: "crm",
 };

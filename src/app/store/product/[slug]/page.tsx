@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { SHIPPING_CLASS_LABEL } from "@/lib/logistics";
 import { stockKind } from "@/components/store/stock";
 import { VariantPicker } from "./variant-picker";
+import { PincodeCheck } from "@/components/store/pincode-check";
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -67,6 +68,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           hsn={p.hsn}
           addons={addons}
         />
+        <PincodeCheck shippingClass={p.variants[0].shippingClass} />
         <Card className="mt-6 p-4 text-sm text-muted">
           Retail prices include {p.gstRate}% GST. Dealer prices are shown ex-GST (+ GST){p.hsn ? ` - HSN ${p.hsn}` : ""}. Tax invoice emailed after payment.
         </Card>
