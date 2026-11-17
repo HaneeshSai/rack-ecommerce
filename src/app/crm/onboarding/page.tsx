@@ -19,7 +19,7 @@ export default async function Onboarding() {
 
   return (
     <>
-      <PageTitle title="Dealer onboarding" sub="Review new trade partners: check the GSTIN, confirm the profile, then approve with a tier, hub and credit terms." />
+      <PageTitle title="New dealers" sub="Check each new dealer, then approve them. First verify their GST number (GSTIN), then choose their price level, hub and credit." />
       <h2 className="mb-3 font-bold">Waiting for review ({pending.length})</h2>
       {pending.length === 0 && <Card className="p-6 text-sm text-muted">No applications waiting.</Card>}
       <div className="space-y-4">

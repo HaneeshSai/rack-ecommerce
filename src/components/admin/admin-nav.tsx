@@ -10,8 +10,10 @@ export function AdminNav({
   who,
   role,
   title = "Back Office",
+  cta,
 }: {
-  links: { href: string; label: string }[];
+  links: { href: string; label: string; badge?: number }[];
+  cta?: { href: string; label: string };
   who?: string;
   role?: string;
   title?: string;
@@ -38,7 +40,7 @@ export function AdminNav({
         )}
       </div>
       {who && (
-        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2 text-sm">
+        <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-2 text-sm">
           {links.map((l) => (
             <Link
               key={l.href}
@@ -49,8 +51,10 @@ export function AdminNav({
               )}
             >
               {l.label}
+              {l.badge ? <span className="ml-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-white">{l.badge}</span> : null}
             </Link>
           ))}
+          {cta && <Link href={cta.href} className="ml-auto whitespace-nowrap rounded-lg bg-accent px-3 py-1.5 font-semibold text-white hover:brightness-110">{cta.label}</Link>}
         </nav>
       )}
     </header>

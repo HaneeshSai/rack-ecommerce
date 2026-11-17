@@ -16,7 +16,7 @@ export default async function Logistics() {
 
   return (
     <>
-      <PageTitle title="Logistics" sub="Daily shipping across the Hyderabad, Vijayawada and Tirupati hubs: book vehicles, dispatch, and track what is on the road." />
+      <PageTitle title="Shipping" sub="Orders being shipped from each hub. See which need a vehicle, which are booked and which are on the road." />
       <div className="grid gap-6">
         {S.warehouses.map((w) => {
           const rows = orders.filter((o) => o.hub === w.code);

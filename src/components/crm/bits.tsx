@@ -9,3 +9,9 @@ export const ageText = (iso: string) => {
   const d = ageDays(iso);
   return d === 0 ? "today" : d === 1 ? "1 day ago" : `${d} days ago`;
 };
+
+export const HealthBadge = ({ h }: { h: { score: number; level: "good" | "watch" | "risk" } }) => (
+  <Badge tone={h.level === "good" ? "green" : h.level === "watch" ? "amber" : "red"}>
+    {h.level === "good" ? "Healthy" : h.level === "watch" ? "Watch" : "At risk"} · {h.score}
+  </Badge>
+);

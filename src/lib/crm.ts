@@ -3,13 +3,13 @@ import type { CrmStage } from "@/lib/db";
 
 // The coordinator's 8-step flow, grouped into the stages an order moves through.
 export const CRM_STAGES: { key: CrmStage; label: string; step: string; owner: string }[] = [
-  { key: "NEW", label: "Sales order", step: "1-2", owner: "CRM screens it" },
-  { key: "WITH_ACCOUNTS", label: "With accounts", step: "2-3", owner: "Accounts invoices it" },
-  { key: "INVOICED", label: "Invoice and DC ready", step: "3-4", owner: "CRM books vehicle" },
-  { key: "LOGISTICS", label: "Vehicle booked", step: "4-5", owner: "Hub dispatches" },
-  { key: "DISPATCHED", label: "Dispatched", step: "5-6", owner: "CRM sends docs" },
-  { key: "DOCS_SENT", label: "Payment follow-up", step: "6-7", owner: "CRM chases payment" },
-  { key: "PAID", label: "Paid and reported", step: "8", owner: "Done" },
+  { key: "NEW", label: "New orders", step: "1-2", owner: "You check them" },
+  { key: "WITH_ACCOUNTS", label: "With Accounts", step: "2-3", owner: "Waiting for the invoice" },
+  { key: "INVOICED", label: "Ready to ship", step: "3-4", owner: "Book a vehicle" },
+  { key: "LOGISTICS", label: "Vehicle booked", step: "4-5", owner: "Send it off" },
+  { key: "DISPATCHED", label: "On the road", step: "5-6", owner: "Send papers to dealer" },
+  { key: "DOCS_SENT", label: "Collect payment", step: "6-7", owner: "Follow up with dealer" },
+  { key: "PAID", label: "Finished", step: "8", owner: "Paid and reported" },
 ];
 
 export const STAGE_LABEL = Object.fromEntries(CRM_STAGES.map((s) => [s.key, s.label])) as Record<CrmStage, string>;

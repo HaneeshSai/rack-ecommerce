@@ -68,6 +68,7 @@ export function screenOrder(o: CrmOrder): Check[] {
   checks.push({ ok: !!d?.gstVerified, blocking: false, label: "GSTIN verified", detail: d ? d.gstin : "-" });
 
   if (o.terms.startsWith("Credit") && d) {
+    checks.push({ ok: !d.creditHold, blocking: true, label: "Credit is not on hold", detail: d.creditHold ? `On hold: ${d.creditHold.reason} Change the terms to advance, or release the hold on the dealer page.` : "All clear" });
     const free = d.creditLimit - d.creditUsed;
     checks.push({ ok: total <= free, blocking: true, label: "Order is within credit limit", detail: `Order Rs ${Math.round(total / 100).toLocaleString("en-IN")} vs available Rs ${Math.round(Math.max(0, free) / 100).toLocaleString("en-IN")}` });
     const overdue = overdueFor(d);
@@ -94,3 +95,53 @@ export function overdueFor(d: Dealer): number {
 }
 
 export { gstinFormatOk };
+
+// ---- Dealer health: one score and plain reasons, plus a re-order reminder ----
+export type Health = {
+  score: number; level: "good" | "watch" | "risk"; reasons: { text: string; bad: boolean }[];
+  lastOrder: number | null; quietDays: number | null;
+  reorder: { everyDays: number; daysSince: number; due: boolean } | null;
+};
+
+export function dealerHealth(d: Dealer): Health {
+  const S = mock.S();
+  const now = Date.now();
+  const reasons: Health["reasons"] = [];
+  let score = 100;
+
+  const overdue = overdueFor(d);
+  if (overdue) { score -= 25 * Math.min(overdue, 2); reasons.push({ text: `${overdue} invoice(s) overdue`, bad: true }); }
+  else reasons.push({ text: "Pays on time", bad: false });
+
+  const bounced = S.cheques.filter((c) => c.dealerId === d.id && c.status === "BOUNCED").length;
+  if (bounced) { score -= 20; reasons.push({ text: `${bounced} bounced cheque(s)`, bad: true }); }
+
+  const util = d.creditLimit > 0 ? d.creditUsed / d.creditLimit : 0;
+  if (util > 0.85) { score -= 10; reasons.push({ text: `Using ${Math.round(util * 100)}% of the credit limit`, bad: true }); }
+
+  const claims = S.claims.filter((c) => c.dealerId === d.id && (c.status === "OPEN" || c.status === "APPROVED")).length;
+  if (claims) { score -= 5; reasons.push({ text: `${claims} claim(s) still open`, bad: true }); }
+
+  if (d.creditHold) { score -= 15; reasons.push({ text: "Credit is on hold", bad: true }); }
+
+  const times = [
+    ...S.orders.filter((o) => o.dealerId === d.id && o.status !== "CANCELLED").map((o) => o.createdAt.getTime()),
+    ...S.crmOrders.filter((o) => o.dealerId === d.id).map((o) => o.createdAt.getTime()),
+  ].sort((a, b) => a - b);
+  const last = times.length ? times[times.length - 1] : null;
+  const quietDays = last ? Math.floor((now - last) / DAY) : null;
+  if (quietDays === null || quietDays >= 60) { score -= 30; reasons.push({ text: quietDays === null ? "Has never ordered" : `No order for ${quietDays} days`, bad: true }); }
+  else if (quietDays >= 30) { score -= 15; reasons.push({ text: `No order for ${quietDays} days`, bad: true }); }
+  else reasons.push({ text: "Ordered recently", bad: false });
+
+  // Re-order rhythm: needs 3+ orders on different days to be meaningful.
+  const days = [...new Set(times.map((t) => Math.floor(t / DAY)))];
+  let reorder: Health["reorder"] = null;
+  if (days.length >= 3 && last) {
+    const every = Math.max(1, Math.round((days[days.length - 1] - days[0]) / (days.length - 1)));
+    reorder = { everyDays: every, daysSince: quietDays ?? 0, due: (quietDays ?? 0) >= every };
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  return { score, level: score >= 75 ? "good" : score >= 45 ? "watch" : "risk", reasons, lastOrder: last, quietDays, reorder };
+}

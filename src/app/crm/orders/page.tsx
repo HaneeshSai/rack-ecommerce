@@ -21,7 +21,7 @@ export default async function CrmOrders({ searchParams }: { searchParams: Promis
     <>
       <PageTitle
         title="Sales orders"
-        sub="Every order shows what to do next. Click one to continue."
+        sub="Every order shows what to do next. Click one to continue. Amber means it has waited 2 days or more. Red means 4 days or more, or the dealer is late paying."
         action={<LinkButton href="/orders/new">+ New sales order</LinkButton>}
       />
       <div className="mb-4 flex flex-wrap gap-2 text-sm">

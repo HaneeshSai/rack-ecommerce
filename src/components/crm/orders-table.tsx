@@ -25,7 +25,7 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase text-muted">
               <th className="p-3">Order</th><th className="p-3">Dealer</th><th className="p-3">Next action</th><th className="p-3">Stage</th>
-              <th className="p-3 text-right">Total</th><th className="p-3">Hub</th><th className="p-3">Entered</th>
+              <th className="hidden p-3 text-right sm:table-cell">Total</th><th className="hidden p-3 md:table-cell">Hub</th><th className="hidden p-3 md:table-cell">Entered</th>
             </tr>
           </thead>
           <tbody>
@@ -35,9 +35,9 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
                 <td className="p-3"><Link href={`/dealers/${o.dealerId}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{o.dealerName}</Link><div className="text-xs text-muted">{o.fieldRep}</div></td>
                 <td className="p-3 font-medium">{o.next}{o.urgency === "late" || o.urgency === "warn" ? <div className={clsx("text-xs font-semibold", o.urgency === "late" ? "text-red-600" : "text-amber-600")}>{o.overdueDays > 0 ? "Payment overdue" : `Waiting ${o.stageDays} days`}</div> : null}</td>
                 <td className="p-3"><StageBadge stage={o.stage} />{o.overdueDays > 0 && <> <Badge tone="red">{o.overdueDays}d overdue</Badge></>}</td>
-                <td className="p-3 text-right">{inr(o.total)}</td>
-                <td className="p-3">{o.hub}</td>
-                <td className="p-3 text-muted">{ageText(o.createdAt)}</td>
+                <td className="hidden p-3 text-right sm:table-cell">{inr(o.total)}</td>
+                <td className="hidden p-3 md:table-cell">{o.hub}</td>
+                <td className="hidden p-3 text-muted md:table-cell">{ageText(o.createdAt)}</td>
               </tr>
             ))}
             {list.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted">No orders found.</td></tr>}

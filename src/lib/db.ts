@@ -30,7 +30,7 @@ export type Dealer = {
   phone: string; email: string; city: string; address: string;
   status: DealerStatus; tier: Tier; homeWarehouse: string; termsDays: number;
   creditLimit: number; creditUsed: number; assignedRep: string; appliedAt: Date;
-  addresses: string[];
+  addresses: string[]; creditHold?: { reason: string; by: string; at: Date } | null;
 };
 export type User = { id: string; email: string; name: string; role: Role; dealerId: string | null; warehouse: string | null };
 export type OrderItem = { id: string; orderId: string; variantId: string; qty: number; unitPrice: number; gstRate: number };
@@ -90,6 +90,20 @@ export type CrmOrder = {
   timeline: { at: Date; by: string; text: string }[];
   createdAt: Date;
 };
+// Cheque register: every cheque a dealer hands over, until it clears or bounces.
+export type ChequeStatus = "RECEIVED" | "DEPOSITED" | "CLEARED" | "BOUNCED";
+export type Cheque = {
+  id: string; dealerId: string; orderId: string | null; chequeNo: string; bank: string; amount: number;
+  chequeDate: string; status: ChequeStatus; receivedAt: Date; log: { at: Date; by: string; text: string }[];
+};
+// Damage / missing / wrong-item claims from dealers (store terms: report within 48 hours).
+export type ClaimKind = "DAMAGED" | "MISSING" | "WRONG_ITEM";
+export type ClaimStatus = "OPEN" | "APPROVED" | "REJECTED" | "CLOSED";
+export type Claim = {
+  id: string; number: string; dealerId: string; orderId: string; kind: ClaimKind; item: string; qty: number; note: string;
+  hoursAfterDelivery: number; photos: number; status: ClaimStatus; outcome: "CREDIT_NOTE" | "REPLACEMENT" | null;
+  creditAmount: number; creditNoteNo: string | null; raisedAt: Date; log: { at: Date; by: string; text: string }[];
+};
 export type Notification = {
   id: string; event: string; to: string; channels: string[]; text: string; ref: string | null; at: Date;
 };
@@ -138,6 +152,7 @@ type State = {
   stock: StockRow[]; dealers: Dealer[]; users: User[]; orders: Order[]; items: OrderItem[]; leads: Lead[];
   quotes: Quote[]; tickets: Ticket[]; tasks: Task[]; movements: StockMovement[]; transfers: Transfer[];
   activity: Activity[]; notifications: Notification[]; settings: Settings; crmOrders: CrmOrder[];
+  cheques: Cheque[]; claims: Claim[];
   seq: number; invoiceSeq: number;
 };
 
@@ -151,7 +166,7 @@ function seed(): State {
   const now = Date.now();
   const s: State = {
     categories: [], products: [], variants: [], warehouses: [], stock: [], dealers: [], users: [], orders: [], items: [],
-    leads: [], quotes: [], tickets: [], tasks: [], movements: [], transfers: [], activity: [], notifications: [], crmOrders: [],
+    leads: [], quotes: [], tickets: [], tasks: [], movements: [], transfers: [], activity: [], notifications: [], crmOrders: [], cheques: [], claims: [],
     settings: {
       holdDays: 3, discountApprovalPct: 10, splitDefault: "SPLIT", lowStock: 5, blockOverdueCredit: true, inactiveDays: 60,
       freight: structuredClone(DEFAULT_FREIGHT), cities: structuredClone(DEFAULT_CITIES),
@@ -305,6 +320,7 @@ function seed(): State {
     s.items.push({ id: id("i"), orderId: oid, variantId: v.id, qty, unitPrice: unit, gstRate: p.gstRate });
   };
   const d0 = s.dealers[0], d1 = s.dealers[1], d3 = s.dealers[3];
+  d3.creditHold = { reason: "Invoice overdue and a cheque bounced. Credit only after payment.", by: "Neha (CRM Coordinator)", at: new Date(now - 5 * DAY) };
   const net = s.variants.findIndex((v) => v.sku.startsWith("NE42U"));
   mk(2, 4, d0, "DELIVERED", 40);
   mk(5, 3, d0, "DISPATCHED", 6);
@@ -361,6 +377,26 @@ function seed(): State {
   crm({ n: 7, dealer: d0, v: [[6, 2]], terms: "Credit 30 days", rep: "Anand (Field Sales)", stage: "DOCS_SENT", ago: 36 });
   crm({ n: 8, dealer: d1, v: [[3, 4]], terms: "Credit 15 days", rep: "Imran (Field Sales)", stage: "PAID", ago: 9 });
 
+  // Cheque register and claims samples.
+  const so = (n: number) => s.crmOrders.find((c) => c.number === `SO-${5000 + n}`)!;
+  const ymd = (d: number) => new Date(now + d * DAY).toISOString().slice(0, 10);
+  const chq = (dealer: Dealer, ord: CrmOrder | null, no: string, bank: string, amt: number, date: string, status: ChequeStatus, ago: number, log: string[]) =>
+    s.cheques.push({ id: id("q"), dealerId: dealer.id, orderId: ord?.id ?? null, chequeNo: no, bank, amount: rupees(amt), chequeDate: date, status, receivedAt: new Date(now - ago * DAY), log: log.map((t, i) => ({ at: new Date(now - (ago - i) * DAY), by: CRM, text: t })) });
+  chq(d0, so(7), "004512", "HDFC Bank", 62000, ymd(-1), "RECEIVED", 1, ["Cheque received from dealer"]);
+  chq(d1, null, "118830", "ICICI Bank", 48500, ymd(6), "RECEIVED", 2, ["Post-dated cheque received from dealer"]);
+  chq(d0, null, "004390", "HDFC Bank", 25000, ymd(-6), "DEPOSITED", 6, ["Cheque received from dealer", "Deposited at bank"]);
+  chq(d3, null, "771204", "SBI", 30000, ymd(-12), "BOUNCED", 12, ["Cheque received from dealer", "Deposited at bank", "Bounced: insufficient funds"]);
+  chq(d1, so(8), "118702", "ICICI Bank", 40000, ymd(-20), "CLEARED", 20, ["Cheque received from dealer", "Deposited at bank", "Cleared"]);
+  const clm = (n: number, dealer: Dealer, ord: CrmOrder, kind: ClaimKind, item: string, qty: number, note: string, hrs: number, status: ClaimStatus, ago: number) =>
+    s.claims.push({
+      id: id("cl"), number: `CL-${700 + n}`, dealerId: dealer.id, orderId: ord.id, kind, item, qty, note, hoursAfterDelivery: hrs, photos: kind === "MISSING" ? 0 : 2,
+      status, outcome: status === "CLOSED" ? "CREDIT_NOTE" : null, creditAmount: status === "CLOSED" ? rupees(1800) : 0, creditNoteNo: status === "CLOSED" ? `CN/${700 + n}` : null,
+      raisedAt: new Date(now - ago * DAY), log: [{ at: new Date(now - ago * DAY), by: "Dealer call", text: "Claim raised" }],
+    });
+  clm(1, d0, so(7), "DAMAGED", "Wall mount rack (door dent)", 1, "Door bent on arrival, photos sent on WhatsApp.", 20, "OPEN", 1);
+  clm(2, d1, so(8), "WRONG_ITEM", "9U rack, 500mm depth", 1, "Received 450mm depth instead.", 70, "OPEN", 3);
+  clm(3, d1, so(8), "MISSING", "Cage nuts pack", 2, "Packs not in the box.", 10, "CLOSED", 14);
+
   s.quotes = [
     {
       id: id("q"), number: "QT-2001", dealerId: d0.id, leadId: null, status: "SENT", discountPct: 5, version: 1,
@@ -404,7 +440,7 @@ function seed(): State {
 }
 
 // Bump SEED_VERSION when the seed shape changes so a running dev server drops its stale copy.
-const SEED_VERSION = 5;
+const SEED_VERSION = 7;
 const g = globalThis as unknown as { __mockState?: State; __mockVersion?: number };
 const S = () => {
   if (!g.__mockState || g.__mockVersion !== SEED_VERSION) {

@@ -211,3 +211,118 @@ export async function markDelivered(id: string): Promise<R> {
   step(o, u.name, "Goods delivered to dealer");
   return { ok: true, msg: "Marked as delivered" };
 }
+
+// ---- Cheque register -------------------------------------------------------
+export async function addCheque(input: { dealerId: string; orderId: string; chequeNo: string; bank: string; amount: number; chequeDate: string }): Promise<R> {
+  const u = await requireUser("CRM");
+  const S = mock.S();
+  const d = S.dealers.find((x) => x.id === input.dealerId);
+  if (!d) return fail("Pick a dealer.");
+  if (!input.chequeNo.trim()) return fail("Enter the cheque number.");
+  if (!(input.amount > 0)) return fail("Enter the cheque amount.");
+  if (!input.chequeDate) return fail("Enter the date written on the cheque.");
+  if (S.cheques.some((c) => c.chequeNo === input.chequeNo.trim() && c.bank === input.bank.trim())) return fail("This cheque is already in the register.");
+  const post = input.chequeDate > new Date().toISOString().slice(0, 10);
+  S.cheques.unshift({
+    id: mock.id("q"), dealerId: d.id, orderId: input.orderId || null, chequeNo: input.chequeNo.trim(), bank: input.bank.trim() || "Bank not noted",
+    amount: Math.round(input.amount * 100), chequeDate: input.chequeDate, status: "RECEIVED", receivedAt: new Date(),
+    log: [{ at: new Date(), by: u.name, text: post ? "Post-dated cheque received from dealer" : "Cheque received from dealer" }],
+  });
+  return { ok: true, msg: post ? "Post-dated cheque added" : "Cheque added" };
+}
+
+export async function setChequeStatus(id: string, status: "DEPOSITED" | "CLEARED" | "BOUNCED", reason = ""): Promise<R> {
+  const u = await requireUser("CRM");
+  const S = mock.S();
+  const c = S.cheques.find((x) => x.id === id);
+  if (!c) return fail("Cheque not found.");
+  const ok = (c.status === "RECEIVED" && status === "DEPOSITED") || (c.status === "DEPOSITED" && (status === "CLEARED" || status === "BOUNCED"));
+  if (!ok) return fail("That step is not allowed for this cheque.");
+  if (status === "BOUNCED" && !reason.trim()) return fail("Write the bounce reason.");
+  c.status = status;
+  c.log.push({ at: new Date(), by: u.name, text: status === "DEPOSITED" ? "Deposited at bank" : status === "CLEARED" ? "Cleared" : `Bounced: ${reason.trim()}` });
+  const o = c.orderId ? find(c.orderId) : undefined;
+  if (o && status === "CLEARED" && o.stage === "DOCS_SENT" && !o.payment) {
+    o.payment = { utr: `CHQ ${c.chequeNo}`, amount: c.amount, mode: "Cheque", at: new Date(), reported: false };
+    step(o, u.name, `Cheque ${c.chequeNo} cleared. Report the payment to accounts`);
+    return { ok: true, msg: `Cleared. ${o.number} is ready to report to accounts` };
+  }
+  if (o && status === "BOUNCED") step(o, u.name, `Cheque ${c.chequeNo} bounced: ${reason.trim()}`);
+  if (status === "BOUNCED") S.tasks.unshift({ id: mock.id("k"), title: `Cheque ${c.chequeNo} bounced: ask the dealer for a new payment`, due: new Date(Date.now() + DAY), done: false, ref: c.orderId ? o?.number ?? null : null, owner: u.name, auto: false });
+  return { ok: true, msg: status === "BOUNCED" ? "Marked bounced. A follow-up task was created" : `Cheque ${status.toLowerCase()}` };
+}
+
+// ---- Claims: damaged, missing or wrong items ---------------------------------
+export async function raiseClaim(input: { orderId: string; kind: "DAMAGED" | "MISSING" | "WRONG_ITEM"; item: string; qty: number; note: string; hoursAfterDelivery: number; photos: number }): Promise<R> {
+  const u = await requireUser("CRM");
+  const S = mock.S();
+  const o = find(input.orderId);
+  if (!o) return fail("Pick the order.");
+  if (!input.item.trim()) return fail("Say which item.");
+  if (!(input.qty > 0)) return fail("Enter how many pieces.");
+  const n = 700 + S.claims.length + 1;
+  const late = input.hoursAfterDelivery > 48;
+  S.claims.unshift({
+    id: mock.id("cl"), number: `CL-${n}`, dealerId: o.dealerId, orderId: o.id, kind: input.kind, item: input.item.trim(), qty: Math.round(input.qty),
+    note: input.note.trim(), hoursAfterDelivery: Math.max(0, input.hoursAfterDelivery || 0), photos: Math.max(0, input.photos || 0),
+    status: "OPEN", outcome: null, creditAmount: 0, creditNoteNo: null, raisedAt: new Date(),
+    log: [{ at: new Date(), by: u.name, text: `Claim raised${late ? " (after the 48-hour window)" : ""}` }],
+  });
+  step(o, u.name, `Claim CL-${n} raised: ${input.item.trim()}`);
+  return { ok: true, msg: `Claim CL-${n} raised` };
+}
+
+export async function decideClaim(id: string, input: { approve: boolean; outcome: "CREDIT_NOTE" | "REPLACEMENT"; amount: number; note: string }): Promise<R> {
+  const u = await requireUser("CRM");
+  const c = mock.S().claims.find((x) => x.id === id);
+  if (!c || c.status !== "OPEN") return fail("This claim is already decided.");
+  if (!input.approve) {
+    if (!input.note.trim()) return fail("Write why it is rejected.");
+    c.status = "REJECTED";
+    c.log.push({ at: new Date(), by: u.name, text: `Rejected: ${input.note.trim()}` });
+    return { ok: true, msg: "Claim rejected" };
+  }
+  if (input.outcome === "CREDIT_NOTE" && !(input.amount > 0)) return fail("Enter the credit note amount.");
+  c.status = "APPROVED";
+  c.outcome = input.outcome;
+  c.creditAmount = input.outcome === "CREDIT_NOTE" ? Math.round(input.amount * 100) : 0;
+  c.log.push({ at: new Date(), by: u.name, text: input.outcome === "CREDIT_NOTE" ? "Approved: credit note to be issued" : "Approved: replacement to be sent" });
+  mock.notify("Claim approved", c.dealerId, ["WhatsApp"], `Claim ${c.number} approved (${input.outcome === "CREDIT_NOTE" ? "credit note" : "replacement"}).`, c.number);
+  return { ok: true, msg: "Claim approved" };
+}
+
+export async function closeClaim(id: string, creditNoteNo: string): Promise<R> {
+  const u = await requireUser("CRM");
+  const c = mock.S().claims.find((x) => x.id === id);
+  if (!c || c.status !== "APPROVED") return fail("Approve the claim first.");
+  if (c.outcome === "CREDIT_NOTE") {
+    if (!creditNoteNo.trim()) return fail("Enter the credit note number from Accounts.");
+    c.creditNoteNo = creditNoteNo.trim();
+    const d = mock.S().dealers.find((x) => x.id === c.dealerId);
+    if (d) d.creditUsed = Math.max(0, d.creditUsed - c.creditAmount);
+  }
+  c.status = "CLOSED";
+  c.log.push({ at: new Date(), by: u.name, text: c.outcome === "CREDIT_NOTE" ? `Credit note ${c.creditNoteNo} issued` : "Replacement sent" });
+  return { ok: true, msg: "Claim closed" };
+}
+
+// ---- Stop-credit hold ------------------------------------------------------
+export async function setCreditHold(dealerId: string, reason: string): Promise<R> {
+  const u = await requireUser("CRM");
+  const d = mock.S().dealers.find((x) => x.id === dealerId);
+  if (!d) return fail("Dealer not found.");
+  if (!reason.trim()) return fail("Write the reason for the hold.");
+  d.creditHold = { reason: reason.trim(), by: u.name, at: new Date() };
+  mock.log(u.name, `Put credit on hold for ${d.businessName}: ${reason.trim()}`);
+  return { ok: true, msg: "Credit put on hold. New credit orders will be blocked." };
+}
+
+export async function releaseCreditHold(dealerId: string, note: string): Promise<R> {
+  const u = await requireUser("CRM");
+  const d = mock.S().dealers.find((x) => x.id === dealerId);
+  if (!d?.creditHold) return fail("This dealer has no hold.");
+  if (!note.trim()) return fail("Write why you are releasing it.");
+  d.creditHold = null;
+  mock.log(u.name, `Released credit hold for ${d.businessName}: ${note.trim()}`);
+  return { ok: true, msg: "Hold released" };
+}

@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { Badge, Card, LinkButton, StatCard } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 import { mock } from "@/lib/db";
-import { serializeCrm, overdueFor } from "@/lib/crm-data";
+import { serializeCrm, overdueFor, dealerHealth } from "@/lib/crm-data";
 import { waLink } from "@/lib/crm";
 import { inr } from "@/lib/money";
 import { fmtDate, fmtDateTime, STATUS_LABEL } from "@/components/admin/format";
 import { StageBadge, ageText } from "@/components/crm/bits";
+import { CreditHold } from "@/components/crm/credit-hold";
+import { HealthBadge } from "@/components/crm/bits";
 import { CallLogger } from "@/components/crm/call-logger";
 
 export default async function DealerProfile({ params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +27,7 @@ export default async function DealerProfile({ params }: { params: Promise<{ id: 
   const sales = crm.reduce((n, o) => n + o.total, 0) + store.filter((o) => o.status !== "CANCELLED").reduce((n, o) => n + o.total, 0);
   const usedPct = d.creditLimit > 0 ? Math.min(100, Math.round((d.creditUsed / d.creditLimit) * 100)) : 0;
   const overdue = overdueFor(d);
+  const h = dealerHealth(d);
   const lastOrder = [...crm.map((o) => o.createdAt), ...store.map((o) => o.createdAt.toISOString())].sort().at(-1);
 
   return (

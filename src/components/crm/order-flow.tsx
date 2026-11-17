@@ -14,14 +14,14 @@ import { fmtDate, fmtDateTime } from "@/components/admin/format";
 import { useRun } from "./use-run";
 
 const STEPS = [
-  "Sales order received",
-  "Screened and sent to accounts",
-  "Invoice and DC from accounts",
-  "Vehicle arranged",
-  "Dispatched, sales guy informed",
-  "Invoice, DC and driver details to dealer",
-  "Payment follow-up",
-  "Payment reported to accounts",
+  "Order received",
+  "Checked and sent to Accounts",
+  "Invoice and DC received",
+  "Vehicle booked",
+  "Dispatched, sales person told",
+  "Papers sent to dealer",
+  "Dealer pays",
+  "Accounts told about the payment",
 ];
 
 // Index of the step the coordinator should work on now.
@@ -57,7 +57,8 @@ export function OrderFlow({ order: o, checks, recent }: { order: CrmDTO; checks:
   const cur = activeStep(o);
   return (
     <Card className="p-5">
-      <h2 className="mb-4 font-bold">Process</h2>
+      <h2 className="mb-1 font-bold">Where this order is</h2>
+      <p className="mb-4 text-xs text-muted">Green ticks are done. The blue number is what to do now.</p>
       <ol className="mb-5 space-y-2">
         {STEPS.map((s, i) => (
           <li key={s} className="flex items-center gap-3 text-sm">
@@ -85,13 +86,22 @@ const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <label className="block text-sm"><span className="text-xs text-muted">{label}</span>{children}</label>
 );
 
+// Every step says where you are, what to do and why, in plain words.
+const StepHead = ({ n, title, hint }: { n: number; title: string; hint: string }) => (
+  <div>
+    <div className="text-xs font-semibold uppercase tracking-wide text-accent">Step {n} of 8</div>
+    <h3 className="text-base font-bold">{title}</h3>
+    <p className="mt-0.5 text-xs text-muted">{hint}</p>
+  </div>
+);
+
 function Screening({ o, checks }: { o: CrmDTO; checks: Check[] }) {
   const { run, pending } = useRun();
   const blocked = checks.some((c) => !c.ok && c.blocking);
   const [override, setOverride] = useState(false);
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Step 2: screen and send to accounts</h3>
+      <StepHead n={2} title="Check the order, then send it to Accounts" hint="Look at the checks below. If they are fine, send it. Accounts will then prepare the invoice and delivery challan (DC)." />
       <ul className="space-y-2 text-sm">
         {checks.map((c) => (
           <li key={c.label} className="flex items-start gap-2">
@@ -103,12 +113,12 @@ function Screening({ o, checks }: { o: CrmDTO; checks: Check[] }) {
       {blocked && (
         <label className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs text-red-800">
           <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} className="mt-0.5" />
-          A blocking check failed. Tick to send to accounts anyway after speaking to the sales manager.
+          A check marked with a red cross failed. Talk to the sales manager first. If they agree, tick this box to send the order anyway.
         </label>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button disabled={pending || (blocked && !override)} onClick={() => run(() => sendToAccounts(o.id))}>Send to accounts</Button>
-        {o.terms.startsWith("Advance") && <Button variant="ghost" disabled={pending} onClick={() => run(() => issueProforma(o.id))}>Issue proforma (NEFT/RTGS)</Button>}
+        <Button disabled={pending || (blocked && !override)} onClick={() => run(() => sendToAccounts(o.id))}>Send to Accounts</Button>
+        {o.terms.startsWith("Advance") && <Button variant="ghost" disabled={pending} onClick={() => run(() => issueProforma(o.id))}>Send proforma (bill for bank transfer)</Button>}
       </div>
     </div>
   );
@@ -120,15 +130,14 @@ function InvoiceStep({ o }: { o: CrmDTO }) {
   const [dcNo, setDc] = useState("");
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Step 3: record the invoice and DC from accounts</h3>
-      <p className="text-xs text-muted">Waiting for Accounts. Enter the numbers when they send them over.</p>
+      <StepHead n={3} title="Enter the invoice and DC numbers" hint="Accounts is preparing these. When they send them to you, type the numbers here. The DC (delivery challan) is the paper that travels with the goods." />
       <div className="grid grid-cols-2 gap-2">
         <Field label="Invoice number"><input className={inputCls} value={invoiceNo} onChange={(e) => setInvoice(e.target.value)} placeholder="RH/25-26/0123" /></Field>
         <Field label="DC number"><input className={inputCls} value={dcNo} onChange={(e) => setDc(e.target.value)} placeholder="DC-123" /></Field>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button disabled={pending} onClick={() => run(() => recordInvoice(o.id, { invoiceNo, dcNo }))}>Save invoice and DC</Button>
-        {o.terms.startsWith("Advance") && <Button variant="ghost" disabled={pending} onClick={() => run(() => issueProforma(o.id))}>Resend proforma</Button>}
+        {o.terms.startsWith("Advance") && <Button variant="ghost" disabled={pending} onClick={() => run(() => issueProforma(o.id))}>Send proforma again</Button>}
       </div>
     </div>
   );
@@ -140,7 +149,7 @@ function VehicleStep({ o, recent }: { o: CrmDTO; recent: Recent[] }) {
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Step 4: arrange the vehicle from {o.hub}</h3>
+      <StepHead n={4} title={`Book a vehicle from the ${o.hub} hub`} hint="Book a Porter or another vehicle, then write down who is driving. Tap a recent vehicle to fill the details quickly." />
       {recent.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="text-muted">Use a recent one:</span>
@@ -157,7 +166,7 @@ function VehicleStep({ o, recent }: { o: CrmDTO; recent: Recent[] }) {
         <Field label="Driver name"><input className={inputCls} value={v.driverName} onChange={set("driverName")} /></Field>
         <Field label="Driver phone"><input className={inputCls} value={v.driverPhone} onChange={set("driverPhone")} /></Field>
       </div>
-      <Button disabled={pending} onClick={() => run(() => bookVehicle(o.id, v))}>Save vehicle booking</Button>
+      <Button disabled={pending} onClick={() => run(() => bookVehicle(o.id, v))}>Save vehicle details</Button>
     </div>
   );
 }
@@ -173,21 +182,21 @@ Vehicle: ${v.vehicleNo} (${v.provider})
 Driver: ${v.driverName} ${v.driverPhone}`;
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Step 5: dispatch and inform {o.fieldRep}</h3>
+      <StepHead n={5} title="Send it off and tell the sales person" hint={`Press the button when the vehicle leaves. ${o.fieldRep} gets the message below.`} />
       <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-line">
         <b>{v.provider}</b> · {v.vehicleType} · {v.vehicleNo}<br />Driver {v.driverName} {v.driverPhone} · Booking {v.bookingId || "-"}
       </div>
       {advance && (
         <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
           <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="mt-0.5" />
-          This order is advance payment. Tick once the NEFT/RTGS payment has cleared.
+          The dealer pays before delivery for this order. Tick this box once their bank transfer has reached us.
         </label>
       )}
       <div>
-        <div className="mb-1 text-xs text-muted">Message for the sales guy (sent when you dispatch)</div>
+        <div className="mb-1 text-xs text-muted">Message for the sales person</div>
         <MessageBox text={msg} />
       </div>
-      <Button disabled={pending || !paid} onClick={() => run(() => dispatchOrder(o.id))}>Mark dispatched and inform sales</Button>
+      <Button disabled={pending || !paid} onClick={() => run(() => dispatchOrder(o.id))}>Dispatch and tell sales</Button>
     </div>
   );
 }
@@ -202,9 +211,9 @@ Vehicle: ${v.vehicleNo} (${v.vehicleType})
 Driver: ${v.driverName} ${v.driverPhone}`;
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Step 6: send documents to the dealer</h3>
+      <StepHead n={6} title="Send the papers to the dealer" hint="Send this message on WhatsApp (or copy it). Then press the button so we know it is done." />
       <MessageBox text={msg} phone={o.dealerPhone} />
-      <Button disabled={pending} onClick={() => run(() => sendDocsToDealer(o.id))}>Mark documents as sent</Button>
+      <Button disabled={pending} onClick={() => run(() => sendDocsToDealer(o.id))}>I have sent the papers</Button>
     </div>
   );
 }
@@ -219,18 +228,18 @@ function PaymentStep({ o }: { o: CrmDTO }) {
   if (o.payment) {
     return (
       <div className="space-y-3">
-        <h3 className="font-semibold">Step 8: report the payment to accounts</h3>
+        <StepHead n={8} title="Tell Accounts the payment came in" hint="The payment is recorded. Press the button to report it to Accounts and finish this order." />
         <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-line"><b>{inr(o.payment.amount)}</b> via {o.payment.mode} · {o.payment.utr}<div className="text-xs text-muted">Received {fmtDateTime(o.payment.at)}</div></div>
-        <Button disabled={pending} onClick={() => run(() => reportPayment(o.id))}>Report to accounts and close</Button>
+        <Button disabled={pending} onClick={() => run(() => reportPayment(o.id))}>Tell Accounts and finish</Button>
       </div>
     );
   }
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-semibold">Step 7: follow up for payment</h3>
-        <p className="text-xs text-muted">
-          Due {fmtDate(o.dueDate)} {o.overdueDays > 0 ? <Badge tone="red">{o.overdueDays} days overdue</Badge> : null} · coordinate with {o.fieldRep}
+        <StepHead n={7} title="Follow up until the dealer pays" hint={`Call or message the dealer, and write down what they say. Keep ${o.fieldRep} in the loop.`} />
+        <p className="mt-1 text-xs">
+          Payment due {fmtDate(o.dueDate)} {o.overdueDays > 0 ? <Badge tone="red">{o.overdueDays} days late</Badge> : null}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <a href={`tel:${o.dealerPhone}`} className="rounded-lg border border-line bg-white px-3 py-1.5 font-semibold hover:border-slate-300">Call {o.dealerPhone}</a>
@@ -249,9 +258,9 @@ function PaymentStep({ o }: { o: CrmDTO }) {
         <Button variant="ghost" className="mt-2 !py-1.5" disabled={pending} onClick={() => run(() => logFollowup(o.id, { note, promiseDate: promise }), () => { setNote(""); setPromise(""); })}>Save follow-up</Button>
       </div>
       <div className="border-t border-line pt-3">
-        <div className="mb-2 text-sm font-semibold">Payment received?</div>
+        <div className="mb-2 text-sm font-semibold">Did the dealer pay?</div>
         <div className="grid grid-cols-3 gap-2">
-          <Field label="UTR / reference"><input className={inputCls} value={pay.utr} onChange={(e) => setPay({ ...pay, utr: e.target.value })} /></Field>
+          <Field label="Bank reference (UTR)"><input className={inputCls} value={pay.utr} onChange={(e) => setPay({ ...pay, utr: e.target.value })} /></Field>
           <Field label="Amount (Rs)"><input type="number" className={inputCls} value={pay.amount} onChange={(e) => setPay({ ...pay, amount: Number(e.target.value) })} /></Field>
           <Field label="Mode"><select className={inputCls} value={pay.mode} onChange={(e) => setPay({ ...pay, mode: e.target.value })}><option>NEFT</option><option>RTGS</option><option>UPI</option><option>Cheque</option></select></Field>
         </div>

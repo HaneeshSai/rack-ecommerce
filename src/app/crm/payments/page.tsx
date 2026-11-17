@@ -17,7 +17,7 @@ export default async function CrmPayments() {
 
   return (
     <>
-      <PageTitle title="Payments" sub="Chase dealers for payment with the sales team, issue proformas for NEFT/RTGS, and report received payments to accounts." />
+      <PageTitle title="Payments" sub="Dealers who still need to pay. Log each call, and tell Accounts when money comes in." action={<Link href="/collections" className="text-sm font-semibold text-accent">Late by age, cheques, Tally &rarr;</Link>} />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <StatCard label="Outstanding" value={inr(outstanding)} />
         <StatCard label="Overdue" value={inr(overdueAmt)} tone={overdueAmt ? "warn" : "good"} />
