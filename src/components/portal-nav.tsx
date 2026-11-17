@@ -12,7 +12,7 @@ export function PortalNav({
 }) {
   return (
     <header className="border-b border-white/10 bg-linear-to-r from-brand to-brand-2 text-white shadow-md">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-none flex-wrap items-center justify-between gap-3 px-4 lg:px-8 py-3">
         <div className="flex flex-wrap items-center gap-6">
           <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm">R</span>

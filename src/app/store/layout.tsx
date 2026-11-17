@@ -24,7 +24,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       <CompareProvider>
         <CartProvider>
           <div className="bg-brand-2 text-xs text-slate-200">
-            <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-1.5">
+            <div className="mx-auto flex max-w-none items-center justify-between px-4 lg:px-8 py-1.5">
               <span>Free delivery on orders above &#8377;25,000</span>
               <span className="hidden sm:inline">
                 Call {BRAND.supportPhone} &middot; <Link href="/dealer-registration" className="underline hover:text-white">Become a dealer</Link>
@@ -32,7 +32,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
             </div>
           </div>
           <header className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+            <div className="mx-auto flex max-w-none items-center justify-between gap-3 px-4 lg:px-8 py-3">
               <Link href="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm text-white">R</span>
                 <span>
@@ -46,10 +46,10 @@ export default async function StoreLayout({ children }: { children: React.ReactN
                 <CartLink />
               </div>
             </div>
-            <div className="mx-auto max-w-6xl px-4 pb-2 md:hidden">
+            <div className="mx-auto max-w-none px-4 lg:px-8 pb-2 md:hidden">
               <SearchBox />
             </div>
-            <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2 text-sm font-medium">
+            <nav className="mx-auto flex max-w-none gap-1 overflow-x-auto px-4 lg:px-8 pb-2 text-sm font-medium">
               {categories.map((c) => (
                 <Link
                   key={c.id}
@@ -65,9 +65,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
             </nav>
           </header>
           <ViewerBanner />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+          <main className="mx-auto w-full max-w-none flex-1 px-4 lg:px-8 py-8">{children}</main>
           <footer className="mt-12 bg-brand text-slate-300">
-            <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-4">
+            <div className="mx-auto grid max-w-none gap-8 px-4 lg:px-8 py-10 md:grid-cols-4">
               <div>
                 <div className="text-lg font-extrabold text-white">
                   <span className="text-accent">Rack</span>

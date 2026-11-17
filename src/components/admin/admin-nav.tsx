@@ -22,7 +22,7 @@ export function AdminNav({
   const active = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
   return (
     <header className="border-b border-white/10 bg-linear-to-r from-brand to-brand-2 text-white shadow-md print:hidden">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-none flex-wrap items-center justify-between gap-3 px-4 lg:px-8 py-3">
         <Link href="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm">R</span>
           <span>
@@ -40,7 +40,7 @@ export function AdminNav({
         )}
       </div>
       {who && (
-        <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-2 text-sm">
+        <nav className="mx-auto flex max-w-none items-center gap-1 overflow-x-auto px-4 lg:px-8 pb-2 text-sm">
           {links.map((l) => (
             <Link
               key={l.href}

@@ -65,7 +65,7 @@ export function PortalSwitcher() {
   const { current, href } = usePortals();
   return (
     <div className="border-b border-white/10 bg-slate-950 text-xs text-slate-300">
-      <div className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-1.5">
+      <div className="mx-auto flex max-w-none items-center justify-end gap-3 px-4 lg:px-8 py-1.5">
         <span className="hidden text-slate-500 sm:inline">Switch portal</span>
         <div className="flex rounded-full bg-white/5 p-0.5 ring-1 ring-white/10">
           {PORTALS.map((p) => (

@@ -34,7 +34,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   return (
     <ToastProvider>
       <AdminNav links={user ? MENU : []} who={user?.name} role="CRM" title="CRM" cta={user ? { href: "/orders/new", label: "+ New order" } : undefined} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-none flex-1 px-4 lg:px-8 py-8">{children}</main>
     </ToastProvider>
   );
 }

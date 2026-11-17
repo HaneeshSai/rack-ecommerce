@@ -26,7 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <ToastProvider>
       <AdminNav links={links} who={user?.name} role={role ? ROLE_LABEL[role] : undefined} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-none flex-1 px-4 lg:px-8 py-8">{children}</main>
     </ToastProvider>
   );
 }

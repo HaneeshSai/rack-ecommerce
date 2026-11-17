@@ -117,7 +117,7 @@ export function ViewerBanner() {
   if (v.kind === "pending")
     return (
       <div className="border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
-        <div className="mx-auto max-w-6xl px-4 py-2">
+        <div className="mx-auto max-w-none px-4 lg:px-8 py-2">
           <b>Your dealer application is under review.</b> You are seeing retail prices until we approve your account.
         </div>
       </div>
@@ -125,7 +125,7 @@ export function ViewerBanner() {
   if (v.kind === "dealer")
     return (
       <div className="border-b border-emerald-200 bg-emerald-50 text-sm text-emerald-900">
-        <div className="mx-auto max-w-6xl px-4 py-2">
+        <div className="mx-auto max-w-none px-4 lg:px-8 py-2">
           Dealer view: <b>Gold tier</b> trade prices shown <b>excluding GST</b>.
         </div>
       </div>
